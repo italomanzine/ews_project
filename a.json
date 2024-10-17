@@ -1,0 +1,112 @@
+{
+  "read": "2024-10-14T02:22:19.592622862Z",
+  "preread": "2024-10-14T02:22:18.586655022Z",
+  "pids_stats": {
+    "current": 4,
+    "limit": 37981
+  },
+  "blkio_stats": {
+    "io_service_bytes_recursive": [
+      {
+        "major": 259,
+        "minor": 0,
+        "op": "read",
+        "value": 114688
+      },
+      {
+        "major": 259,
+        "minor": 0,
+        "op": "write",
+        "value": 143360
+      }
+    ],
+    "io_serviced_recursive": None,
+    "io_queue_recursive": None,
+    "io_service_time_recursive": None,
+    "io_wait_time_recursive": None,
+    "io_merged_recursive": None,
+    "io_time_recursive": None,
+    "sectors_recursive": None
+  },
+  "num_procs": 0,
+  "storage_stats": {},
+  "cpu_stats": {
+    "cpu_usage": {
+      "total_usage": 1986230000,
+      "usage_in_kernelmode": 973041000,
+      "usage_in_usermode": 1013188000
+    },
+    "system_cpu_usage": 555675430000000,
+    "online_cpus": 16,
+    "throttling_data": {
+      "periods": 0,
+      "throttled_periods": 0,
+      "throttled_time": 0
+    }
+  },
+  "precpu_stats": {
+    "cpu_usage": {
+      "total_usage": 1986230000,
+      "usage_in_kernelmode": 973041000,
+      "usage_in_usermode": 1013188000
+    },
+    "system_cpu_usage": 555659450000000,
+    "online_cpus": 16,
+    "throttling_data": {
+      "periods": 0,
+      "throttled_periods": 0,
+      "throttled_time": 0
+    }
+  },
+  "memory_stats": {
+    "usage": 4894720,
+    "stats": {
+      "active_anon": 3608576,
+      "active_file": 40960,
+      "anon": 3608576,
+      "anon_thp": 0,
+      "file": 204800,
+      "file_dirty": 0,
+      "file_mapped": 0,
+      "file_writeback": 0,
+      "inactive_anon": 0,
+      "inactive_file": 163840,
+      "kernel_stack": 49152,
+      "pgactivate": 0,
+      "pgdeactivate": 0,
+      "pgfault": 70758,
+      "pglazyfree": 0,
+      "pglazyfreed": 0,
+      "pgmajfault": 2,
+      "pgrefill": 0,
+      "pgscan": 0,
+      "pgsteal": 0,
+      "shmem": 0,
+      "slab": 777008,
+      "slab_reclaimable": 551656,
+      "slab_unreclaimable": 225352,
+      "sock": 0,
+      "thp_collapse_alloc": 0,
+      "thp_fault_alloc": 0,
+      "unevictable": 0,
+      "workingset_activate": 0,
+      "workingset_nodereclaim": 0,
+      "workingset_refault": 0
+    },
+    "limit": 33261236224
+  },
+  "name": "/ews",
+  "id": "32176bd7c3aef26074163d730e0b05b6ab1f644ccbdc099e83e7fbf44d774b7a",
+  "networks": {
+    "eth0": {
+      "rx_bytes": 632751,
+      "rx_packets": 1500,
+      "rx_errors": 0,
+      "rx_dropped": 0,
+      "tx_bytes": 296588,
+      "tx_packets": 1417,
+      "tx_errors": 0,
+      "tx_dropped": 0
+    }
+  }
+}
