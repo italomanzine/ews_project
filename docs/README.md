@@ -23,6 +23,7 @@ Este projeto envolve o monitoramento de um **Emergent Web Server (EWS)** rodando
     - [Selecionando o Algoritmo](#selecionando-o-algoritmo)
 - [Gerando e Visualizando Métricas](#gerando-e-visualizando-métricas)
   - [Executar o Script de Plotagem](#executar-o-script-de-plotagem)
+- [Arquitetura do Sistema]()
 - [Resolução de Problemas](#resolução-de-problemas)
 - [Conclusão](#conclusão)
 
@@ -268,6 +269,37 @@ python chart.py
 Cada gráfico terá um título que inclui o nome do algoritmo, por exemplo:
 
 - **"Uso de CPU ao Longo do Tempo - UCB1"**
+
+
+## Arquitetura do Sistema
+
+Este projeto é composto por vários componentes que interagem entre si para monitorar e otimizar o EWS. O diagrama abaixo ilustra a arquitetura do sistema:
+
+![Arquitetura do Sistema](big-picture.png)
+
+*Nota:* Para visualizar este diagrama, você pode usar um visualizador de PlantUML, como o [PlantUML Online Server](), ou extensões em editores de texto como o Visual Studio Code.
+
+**Localização do Arquivo:** O arquivo `big-picture.puml` está localizado dentro da pasta `docs`, juntamente com este `README.md`.
+
+## Resolução de Problemas
+
+* **Endpoints do EWS Não Acessíveis:**
+  Se você receber um erro `404 Resource Not Found` ao acessar endpoints do EWS, certifique-se de que:
+  * O EWS está rodando dentro do contêiner Docker.
+  * A API REST está habilitada e configurada corretamente.
+  * As portas corretas estão expostas e mapeadas no comando de execução do Docker.
+* **Contêiner Docker Não Encontrado:**
+  Se você receber um erro de que o contêiner `ews` não foi encontrado, verifique se:
+  * O contêiner está em execução (`docker ps`).
+  * O nome do contêiner corresponde (`docker ps --format '{{.Names}}'`).
+* **Problemas de Permissão com Logs:**
+  Certifique-se de que o diretório `~/ews_logs` tem as permissões corretas para leitura e escrita dos logs.
+* **Dependências Ausentes:**
+  Se encontrar `ModuleNotFoundError`, certifique-se de que todas as dependências estão instaladas em seu ambiente virtual.
+* **Tempo de Execução Prolongado:**
+  O tempo total de execução pode ser longo, especialmente ao rodar todos os algoritmos. Você pode ajustar o número de iterações no script `ews_monitor.py` modificando a variável `total_iterations`.
+* **Visualização do Diagrama PlantUML:**
+  Se você tiver problemas ao visualizar o diagrama PlantUML no README, considere gerar uma imagem do diagrama usando um visualizador online ou ferramenta local e incluí-la no README.
 
 ## Resolução de Problemas
 
