@@ -5,6 +5,7 @@ import logging
 import pandas as pd
 from pyews.server_interface import ewsRESTInterface as eRI
 from pyews.global_vars import settings
+from tqdm import tqdm  # Biblioteca para a barra de progresso
 
 # Configurações do EWS
 settings["IP"] = "http://localhost:2011/"
@@ -90,6 +91,33 @@ class BruteForce:
     def update(self, arm, reward):
         pass  # Não é necessário atualizar nada para o Força Bruta
 
+# Classe para o algoritmo Guloso (Greedy)
+class Greedy:
+    def __init__(self, n_arms):
+        self.n_arms = n_arms
+        self.rewards = np.zeros(n_arms)
+        self.counts = np.zeros(n_arms)
+        self.best_arm = None
+        self.initial_sampling = True
+
+    def select_arm(self):
+        if self.initial_sampling:
+            # Amostra cada braço uma vez
+            for arm in range(self.n_arms):
+                if self.counts[arm] == 0:
+                    return arm
+            # Após amostrar todos, selecione o melhor
+            self.best_arm = np.argmax(self.rewards / self.counts)
+            self.initial_sampling = False
+            return self.best_arm
+        else:
+            # Sempre retorna o melhor braço encontrado
+            return self.best_arm
+
+    def update(self, arm, reward):
+        self.counts[arm] += 1
+        self.rewards[arm] += reward
+
 # Função para calcular a recompensa com múltiplas métricas
 def calculate_reward(avg_response_time, throughput, cpu_percent, mem_usage):
     weight_response_time = 0.4
@@ -113,6 +141,9 @@ def calculate_reward(avg_response_time, throughput, cpu_percent, mem_usage):
     return reward
 
 def main():
+    # Número total de iterações
+    total_iterations = 1000
+
     # Inicializar o cliente Docker
     docker_client = docker.from_env()
 
@@ -137,7 +168,8 @@ def main():
     print("Selecione o algoritmo para selecionar a configuração ideal do EWS:")
     print("1. UCB1 (Upper Confidence Bound)")
     print("2. Força Bruta")
-    choice = input("Digite 1 ou 2: ")
+    print("3. Algoritmo Guloso (Greedy)")
+    choice = input("Digite 1, 2 ou 3: ")
 
     if choice == '1':
         algorithm = 'UCB1'
@@ -151,61 +183,79 @@ def main():
         # Inicializar o algoritmo Força Bruta
         n_arms = len(configs)
         selector = BruteForce(n_arms)
+    elif choice == '3':
+        algorithm = 'GREEDY'
+        logging.info("Algoritmo selecionado: Guloso")
+        # Inicializar o algoritmo Guloso
+        n_arms = len(configs)
+        selector = Greedy(n_arms)
     else:
         print("Escolha inválida. Por favor, execute o script novamente e selecione uma opção válida.")
         return
 
     # Inicializar o DataFrame para armazenar as métricas ao longo do tempo
-    columns = ['time_in_seconds', 'selected_config_idx', 'reward', 'cpu_percent', 'mem_usage', 'throughput', 'response_time']
+    columns = ['iteration', 'time_in_seconds', 'selected_config_idx', 'reward', 'cpu_percent', 'mem_usage', 'throughput', 'response_time']
     reward_timeseries = pd.DataFrame(columns=columns)
 
     start_time = time.time()
     throughput = 0
 
     try:
-        while True:
-            # Selecionar a próxima composição com base no algoritmo escolhido
-            arm = selector.select_arm()
-            selected_config = configs[arm]
-            logging.info(f"Alterando para a configuração: {selected_config.original_json}")
-            try:
-                eRI.change_configuration(selected_config)
-            except Exception as e:
-                logging.error(f"Falha ao alterar a configuração: {e}")
-                continue
+        # Barra de progresso
+        with tqdm(total=total_iterations) as pbar:
+            for iteration in range(1, total_iterations + 1):
+                # Selecionar a próxima composição com base no algoritmo escolhido
+                arm = selector.select_arm()
+                selected_config = configs[arm]
+                logging.info(f"Iteração {iteration}: Alterando para a configuração {arm}")
+                try:
+                    eRI.change_configuration(selected_config)
+                except Exception as e:
+                    logging.error(f"Falha ao alterar a configuração: {e}")
+                    continue
 
-            # Tempo para a composição estabilizar
-            time.sleep(5)
+                # Tempo para a composição estabilizar
+                time.sleep(5)
 
-            # Coletar métricas
-            perception = eRI.get_perception()
-            avg_response_time = perception.metric_dict.get('response_time').average_value() if perception and 'response_time' in perception.metric_dict else None
-            logging.info(f"Avg Response Time: {avg_response_time}")
-            cpu_percent, mem_usage, throughput = get_container_stats(docker_client=docker_client, prev_throughput=throughput)
+                # Coletar métricas
+                perception = eRI.get_perception()
+                avg_response_time = perception.metric_dict.get('response_time').average_value() if perception and 'response_time' in perception.metric_dict else None
+                logging.info(f"Avg Response Time: {avg_response_time}")
+                cpu_percent, mem_usage, throughput = get_container_stats(docker_client=docker_client, prev_throughput=throughput)
 
-            # Definir a recompensa com base em múltiplas métricas
-            if avg_response_time and throughput and cpu_percent is not None and mem_usage is not None:
-                reward = calculate_reward(avg_response_time, throughput, cpu_percent, mem_usage)
-            else:
-                logging.info(f"Alguma métrica não está disponível. Ignorando esta iteração. Verifique os logs para mais detalhes. Avg Response Time: {avg_response_time}, Throughput: {throughput}, CPU: {cpu_percent}, Memória: {mem_usage}")
-                reward = 0
+                # Definir a recompensa com base em múltiplas métricas
+                if avg_response_time and throughput and cpu_percent is not None and mem_usage is not None:
+                    reward = calculate_reward(avg_response_time, throughput, cpu_percent, mem_usage)
+                else:
+                    logging.info(f"Alguma métrica não está disponível. Ignorando esta iteração. Verifique os logs para mais detalhes. Avg Response Time: {avg_response_time}, Throughput: {throughput}, CPU: {cpu_percent}, Memória: {mem_usage}")
+                    reward = 0
 
-            # Adicionar as métricas ao DataFrame
-            elapsed_time = time.time() - start_time
-            metrics = [elapsed_time, arm, reward, cpu_percent, mem_usage, throughput, avg_response_time]
-            reward_timeseries = reward_timeseries.append(pd.Series(metrics, index=reward_timeseries.columns), ignore_index=True)
+                # Adicionar as métricas ao DataFrame
+                elapsed_time = time.time() - start_time
+                metrics = [iteration, elapsed_time, arm, reward, cpu_percent, mem_usage, throughput, avg_response_time]
+                reward_timeseries = reward_timeseries.append(pd.Series(metrics, index=reward_timeseries.columns), ignore_index=True)
 
-            # Salvar o DataFrame parcialmente em CSV a cada iteração
-            csv_filename = f'reward_timeseries_{algorithm}.csv'
-            reward_timeseries.to_csv(csv_filename, index=False)
+                # Salvar o DataFrame parcialmente em CSV a cada iteração
+                csv_filename = f'reward_timeseries_{algorithm}.csv'
+                reward_timeseries.to_csv(csv_filename, index=False)
 
-            # Atualizar o algoritmo (se necessário)
-            selector.update(arm, reward)
+                # Atualizar o algoritmo (se necessário)
+                selector.update(arm, reward)
 
-            # Intervalo entre as iterações
-            time.sleep(5)
+                # Atualizar a barra de progresso
+                pbar.update(1)
+
+                # Estimativa de tempo restante
+                pbar.set_postfix({'Tempo Restante': f"{((time.time() - start_time) / iteration) * (total_iterations - iteration):.2f} s"})
+
+                # Intervalo entre as iterações
+                time.sleep(5)
     except KeyboardInterrupt:
         logging.info("Monitoramento interrompido pelo usuário.")
+    except Exception as e:
+        logging.error(f"Erro inesperado: {e}")
+    finally:
+        logging.info("Execução concluída.")
 
 if __name__ == "__main__":
     main()
