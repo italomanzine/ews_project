@@ -1,14 +1,10 @@
-# ews_monitor.py
-
 import time
 import docker
 import numpy as np
 import logging
+import pandas as pd
 from pyews.server_interface import ewsRESTInterface as eRI
 from pyews.global_vars import settings
-import pandas as pd
-
-
 
 # Configurações do EWS
 settings["IP"] = "http://localhost:2011/"
@@ -16,9 +12,6 @@ settings["IP"] = "http://localhost:2011/"
 # Configuração do logging
 logging.basicConfig(filename='monitor.log', level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
-
-# Não inicialize o servidor novamente, pois ele já está rodando no Docker
-configurations = eRI.get_all_configs()
 
 # Função auxiliar para calcular uso de CPU
 def calculate_cpu_percent(stats):
@@ -52,7 +45,7 @@ def get_container_stats(docker_client, prev_throughput, container_name='ews'):
         net_io = stats['networks']
         net_input = sum([net['rx_bytes'] for net in net_io.values()])
         net_output = sum([net['tx_bytes'] for net in net_io.values()])
-        throughput = (net_input + net_output) / (1024 ** 2) - prev_throughput # Em MB
+        throughput = (net_input + net_output) / (1024 ** 2) - prev_throughput  # Em MB
 
         logging.info(f"CPU: {cpu_percent:.2f}%, Memória: {mem_usage:.2f}/{mem_limit:.2f} MB, Throughput: {throughput:.2f}MB")
         return cpu_percent, mem_usage, throughput
@@ -60,9 +53,7 @@ def get_container_stats(docker_client, prev_throughput, container_name='ews'):
         logging.error(f"Erro ao obter estatísticas do contêiner: {e}")
         return None, None, None
 
-# Trocar o UCB1 pelo Força Bruta
-# Classe para o algoritmo UCB1 (Upper Confidence Bound)
-# Problema Multi-Armed Bandit
+# Classe para o algoritmo UCB1
 class UCB1:
     def __init__(self, n_arms):
         self.n = np.zeros(n_arms)  # Contador de seleções de cada braço
@@ -86,6 +77,19 @@ class UCB1:
         # Atualização incremental da média
         self.value[arm] = ((n - 1) / n) * value + (1 / n) * reward
 
+# Classe para o algoritmo Força Bruta
+class BruteForce:
+    def __init__(self, n_arms):
+        self.current_arm = -1
+        self.n_arms = n_arms
+
+    def select_arm(self):
+        self.current_arm = (self.current_arm + 1) % self.n_arms
+        return self.current_arm
+
+    def update(self, arm, reward):
+        pass  # Não é necessário atualizar nada para o Força Bruta
+
 # Função para calcular a recompensa com múltiplas métricas
 def calculate_reward(avg_response_time, throughput, cpu_percent, mem_usage):
     weight_response_time = 0.4
@@ -93,11 +97,11 @@ def calculate_reward(avg_response_time, throughput, cpu_percent, mem_usage):
     weight_cpu = 0.2
     weight_mem = 0.1
 
-    # Normalizar as métricas (ajuste os limites conforme necessário)
-    normalized_response_time = 1 / avg_response_time 
+    # Normalizar as métricas (evitar divisão por zero)
+    normalized_response_time = 1 / avg_response_time if avg_response_time else 0
     normalized_throughput = throughput
-    normalized_cpu = 1 / cpu_percent
-    normalized_mem = 1 / mem_usage
+    normalized_cpu = 1 / cpu_percent if cpu_percent else 0
+    normalized_mem = 1 / mem_usage if mem_usage else 0
 
     # Calcular a recompensa
     reward = (weight_response_time * normalized_response_time +
@@ -129,22 +133,39 @@ def main():
     else:
         logging.info(f"Configuração Atual: {current_config.original_json}")
 
-    # Inicializar o algoritmo Upper Confidence Bound (UCB1) 
-    n_arms = len(configs)
-    ucb1 = UCB1(n_arms)
+    # Menu para o usuário escolher o algoritmo
+    print("Selecione o algoritmo para selecionar a configuração ideal do EWS:")
+    print("1. UCB1 (Upper Confidence Bound)")
+    print("2. Força Bruta")
+    choice = input("Digite 1 ou 2: ")
+
+    if choice == '1':
+        algorithm = 'UCB1'
+        logging.info("Algoritmo selecionado: UCB1")
+        # Inicializar o algoritmo UCB1
+        n_arms = len(configs)
+        selector = UCB1(n_arms)
+    elif choice == '2':
+        algorithm = 'BRUTE-FORCE'
+        logging.info("Algoritmo selecionado: Força Bruta")
+        # Inicializar o algoritmo Força Bruta
+        n_arms = len(configs)
+        selector = BruteForce(n_arms)
+    else:
+        print("Escolha inválida. Por favor, execute o script novamente e selecione uma opção válida.")
+        return
 
     # Inicializar o DataFrame para armazenar as métricas ao longo do tempo
     columns = ['time_in_seconds', 'selected_config_idx', 'reward', 'cpu_percent', 'mem_usage', 'throughput', 'response_time']
     reward_timeseries = pd.DataFrame(columns=columns)
 
     start_time = time.time()
-
-    # Ciclo principal de monitoramento e adaptação
     throughput = 0
+
     try:
         while True:
-            # Selecionar a próxima composição
-            arm = ucb1.select_arm()
+            # Selecionar a próxima composição com base no algoritmo escolhido
+            arm = selector.select_arm()
             selected_config = configs[arm]
             logging.info(f"Alterando para a configuração: {selected_config.original_json}")
             try:
@@ -170,15 +191,16 @@ def main():
                 reward = 0
 
             # Adicionar as métricas ao DataFrame
-            elapsed_time = time.time() - start_time 
+            elapsed_time = time.time() - start_time
             metrics = [elapsed_time, arm, reward, cpu_percent, mem_usage, throughput, avg_response_time]
             reward_timeseries = reward_timeseries.append(pd.Series(metrics, index=reward_timeseries.columns), ignore_index=True)
 
             # Salvar o DataFrame parcialmente em CSV a cada iteração
-            reward_timeseries.to_csv('reward_timeseries.csv', index=False)
+            csv_filename = f'reward_timeseries_{algorithm}.csv'
+            reward_timeseries.to_csv(csv_filename, index=False)
 
-            # Atualizar o algoritmo UCB1
-            ucb1.update(arm, reward)
+            # Atualizar o algoritmo (se necessário)
+            selector.update(arm, reward)
 
             # Intervalo entre as iterações
             time.sleep(5)
