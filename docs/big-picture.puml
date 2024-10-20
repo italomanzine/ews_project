@@ -1,0 +1,52 @@
+@startuml
+
+!define ICONPATH ./icons
+
+!include ICONPATH/docker.puml
+!include ICONPATH/python.puml
+!include ICONPATH/file.puml
+!include ICONPATH/chart.puml
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+title Arquitetura do Sistema de Monitoramento do EWS
+
+component [<&docker>\nContêiner Docker\n(EWS)] as DockerContainer
+component [<&python>\nScript de Monitoramento\n(ews_monitor.py)] as MonitorScript
+component [<&python>\nScript de Plotagem\n(chart.py)] as ChartScript
+component [<&file>\nArquivos CSV\n(Métricas)] as CSVFiles
+component [<&chart>\nGráficos Gerados\n(Charts)] as Charts
+
+' Definição dos serviços
+
+rectangle "Docker Daemon" as DockerDaemon
+rectangle "API REST do EWS" as EWSAPI
+
+' Relacionamentos
+
+DockerContainer -left-> DockerDaemon : Executa dentro de
+MonitorScript -down-> DockerDaemon : Coleta métricas do contêiner
+MonitorScript -right-> EWSAPI : Comunica via API REST
+MonitorScript -down-> CSVFiles : Salva métricas em
+ChartScript -down-> CSVFiles : Lê métricas de
+ChartScript -down-> Charts : Gera gráficos em
+
+' Notas
+
+note right of DockerContainer
+  O EWS roda dentro do contêiner Docker.
+end note
+
+note bottom of MonitorScript
+  O script aplica diferentes algoritmos:
+  - UCB1
+  - Força Bruta
+  - Guloso (Greedy)
+end note
+
+note left of ChartScript
+  O script gera gráficos para cada algoritmo.
+end note
+
+@enduml

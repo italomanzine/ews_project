@@ -1,6 +1,7 @@
+
 # Projeto de Monitoramento do EWS
 
-Este projeto envolve o monitoramento de um Emergent Web Server (EWS) rodando dentro de um contêiner Docker usando um script Python. O script coleta várias métricas, como uso de CPU, uso de memória, throughput e tempo de resposta, e aplica o algoritmo Upper Confidence Bound (UCB1) para selecionar a configuração ideal para o EWS. As métricas coletadas são salvas em um arquivo CSV e podem ser visualizadas usando os scripts de plotagem fornecidos.
+Este projeto envolve o monitoramento de um **Emergent Web Server (EWS)** rodando dentro de um contêiner Docker usando um script Python. O script coleta várias métricas, como uso de CPU, uso de memória, throughput e tempo de resposta, e aplica diferentes algoritmos para selecionar a configuração ideal para o EWS. As métricas coletadas são salvas em arquivos CSV e podem ser visualizadas usando os scripts de plotagem fornecidos.
 
 ## Índice
 
@@ -19,8 +20,9 @@ Este projeto envolve o monitoramento de um Emergent Web Server (EWS) rodando den
   - [1. Instalar Dependências Python](#1-instalar-dependências-python)
   - [2. Configurar o Script](#2-configurar-o-script)
   - [3. Executar o Script de Monitoramento](#3-executar-o-script-de-monitoramento)
-- [Coletando Métricas do Contêiner](#coletando-métricas-do-contêiner)
+    - [Selecionando o Algoritmo](#selecionando-o-algoritmo)
 - [Gerando e Visualizando Métricas](#gerando-e-visualizando-métricas)
+  - [Executar o Script de Plotagem](#executar-o-script-de-plotagem)
 - [Resolução de Problemas](#resolução-de-problemas)
 - [Conclusão](#conclusão)
 
@@ -38,17 +40,23 @@ Antes de começar, certifique-se de ter o seguinte instalado em seu sistema:
 ```
 ews_project/
 ├── ews_monitor.py               # Script principal de monitoramento
-├── get_container_metrics.py     # Script para obter métricas do contêiner Docker
-├── plot_metrics.py              # Script para gerar gráficos a partir das métricas
+├── chart.py                     # Script para gerar gráficos a partir das métricas
 ├── requirements.txt             # Dependências Python
-├── reward_timeseries.csv        # Arquivo CSV gerado com as métricas (após executar o script)
+├── reward_timeseries_UCB1.csv             # Métricas do UCB1
+├── reward_timeseries_BRUTE-FORCE.csv      # Métricas do Força Bruta
+├── reward_timeseries_GREEDY.csv           # Métricas do Guloso
 └── charts/                      # Diretório onde os gráficos gerados são salvos
-    ├── reward_ews.png
-    ├── cpu_percent_ews.png
-    ├── mem_usage_ews.png
-    ├── throughput_ews.png
-    ├── response_time_ews.png
-    └── selected_config_idx_ews.png
+    ├── ubc1/                    # Gráficos do algoritmo UCB1
+    │   ├── reward_ews.png
+    │   ├── cpu_percent_ews.png
+    │   ├── mem_usage_ews.png
+    │   ├── throughput_ews.png
+    │   ├── response_time_ews.png
+    │   └── selected_config_idx_ews.png
+    ├── brute_force/             # Gráficos do algoritmo Força Bruta
+    │   └── ...
+    └── greedy/                  # Gráficos do algoritmo Guloso
+        └── ...
 ```
 
 ## Instruções de Configuração
@@ -176,6 +184,7 @@ pandas
 matplotlib
 seaborn
 pyews
+tqdm
 ```
 
 *Nota:* Certifique-se de que `pyews` está instalado. Se não estiver disponível via pip, você pode precisar instalá-lo manualmente.
@@ -196,70 +205,69 @@ Ajuste o IP e a porta se o seu EWS estiver rodando em um endereço ou porta dife
 python ews_monitor.py
 ```
 
-**O que o Script Faz:**
+#### Selecionando o Algoritmo
 
-- Inicializa o cliente Docker.
-- Busca todas as configurações disponíveis do EWS.
-- Usa o algoritmo UCB1 para selecionar a configuração ideal com base nas métricas coletadas.
-- Coleta métricas como uso de CPU, uso de memória, throughput e tempo médio de resposta.
-- Calcula uma recompensa com base nessas métricas.
-- Registra as métricas e recompensas.
-- Salva as métricas em `reward_timeseries.csv`.
-
-## Coletando Métricas do Contêiner
-
-Você pode usar o script `get_container_metrics.py` para obter e exibir métricas do contêiner.
-
-**Uso:**
-
-```bash
-python get_container_metrics.py
-```
-
-**Saída de Exemplo:**
+Ao executar o script, você será apresentado com um menu para selecionar o algoritmo a ser utilizado para selecionar a configuração ideal do EWS:
 
 ```
-Container: ews
-CPU %: 12.34%
-MEM USAGE / LIMIT: 150.00MB / 2000.00MB
-MEM %: 7.50%
-NET I/O: 10.00MB / 8.00MB
-BLOCK I/O: [{'major': 8, 'minor': 0, 'op': 'Read', 'value': 1024}, ...]
-PIDs: 5
+Selecione o algoritmo para selecionar a configuração ideal do EWS:
+1. UCB1 (Upper Confidence Bound)
+2. Força Bruta
+3. Algoritmo Guloso (Greedy)
+4. Rodar todos os métodos
+Digite 1, 2, 3 ou 4:
 ```
 
-*Nota:* Certifique-se de que o nome do contêiner (`ews`) corresponde ao nome do seu contêiner.
+As opções são:
+
+- **1. UCB1 (Upper Confidence Bound):** Um algoritmo de multi-armed bandit que equilibra exploração e exploração.
+- **2. Força Bruta:** Percorre todas as configurações disponíveis de forma sequencial.
+- **3. Algoritmo Guloso (Greedy):** Testa cada configuração uma vez e então continua com a melhor encontrada.
+- **4. Rodar todos os métodos:** Executa todos os algoritmos sequencialmente.
+
+Após selecionar a opção desejada, o script iniciará a execução para um número fixo de iterações (500). Durante a execução, uma barra de progresso será exibida, mostrando o andamento e o tempo estimado restante.
+
+As métricas coletadas serão salvas em arquivos CSV com nomes correspondentes ao algoritmo utilizado, por exemplo:
+
+- `reward_timeseries_UCB1.csv`
+- `reward_timeseries_BRUTE-FORCE.csv`
+- `reward_timeseries_GREEDY.csv`
 
 ## Gerando e Visualizando Métricas
 
-Após executar o script de monitoramento e coletar métricas em `reward_timeseries.csv`, você pode gerar gráficos para visualizar os dados.
+Após executar o script de monitoramento e coletar métricas, você pode gerar gráficos para visualizar os dados.
 
 ### Executar o Script de Plotagem
 
 ```bash
-python plot_metrics.py
+python chart.py
 ```
 
 **O que o Script Faz:**
 
-- Lê o arquivo `reward_timeseries.csv`.
-- Gera gráficos de linha para as seguintes métricas ao longo do tempo:
+- Lê os arquivos CSV gerados para cada algoritmo.
+- Gera gráficos de linha para as seguintes métricas ao longo do tempo, incluindo o nome do algoritmo no título:
+
   - Recompensa
   - Uso de CPU (%)
   - Uso de Memória (MB)
   - Throughput (MB/s)
   - Tempo de Resposta (ms)
 - Gera um gráfico de dispersão para o índice da configuração selecionada ao longo do tempo.
-- Salva os gráficos no diretório `charts/`.
+- Salva os gráficos nos diretórios correspondentes em `charts/`.
 
-**Gráficos Gerados:**
+**Estrutura dos Gráficos Gerados:**
 
-- `charts/reward_ews.png`
-- `charts/cpu_percent_ews.png`
-- `charts/mem_usage_ews.png`
-- `charts/throughput_ews.png`
-- `charts/response_time_ews.png`
-- `charts/selected_config_idx_ews.png`
+- `charts/ubc1/`
+  - Gráficos gerados para o algoritmo UCB1.
+- `charts/brute_force/`
+  - Gráficos gerados para o algoritmo Força Bruta.
+- `charts/greedy/`
+  - Gráficos gerados para o algoritmo Guloso.
+
+Cada gráfico terá um título que inclui o nome do algoritmo, por exemplo:
+
+- **"Uso de CPU ao Longo do Tempo - UCB1"**
 
 ## Resolução de Problemas
 
@@ -282,10 +290,13 @@ python plot_metrics.py
 - **Dependências Ausentes:**
 
   Se encontrar `ModuleNotFoundError`, certifique-se de que todas as dependências estão instaladas em seu ambiente virtual.
+- **Tempo de Execução Prolongado:**
+
+  O tempo total de execução pode ser longo, especialmente ao rodar todos os algoritmos. Você pode ajustar o número de iterações no script `ews_monitor.py` modificando a variável `total_iterations`.
 
 ## Conclusão
 
-Seguindo os passos descritos neste guia, você deverá ser capaz de configurar o contêiner Docker do EWS, executar o script Python de monitoramento, coletar métricas de desempenho e visualizar os dados através dos gráficos gerados. Este projeto fornece uma base para monitorar e otimizar servidores web usando algoritmos adaptativos como o UCB1.
+Seguindo os passos descritos neste guia, você deverá ser capaz de configurar o contêiner Docker do EWS, executar o script Python de monitoramento com diferentes algoritmos, coletar métricas de desempenho e visualizar os dados através dos gráficos gerados. Este projeto fornece uma base para monitorar e otimizar servidores web usando algoritmos adaptativos.
 
 Sinta-se à vontade para explorar e modificar os scripts para atender às suas necessidades ou para implementar funcionalidades e análises adicionais.
 

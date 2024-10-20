@@ -17,11 +17,15 @@ algorithms = {
     'BRUTE-FORCE': {
         'csv_file': 'reward_timeseries_BRUTE-FORCE.csv',
         'output_dir': 'charts/brute_force'
+    },
+    'GREEDY': {
+        'csv_file': 'reward_timeseries_GREEDY.csv',
+        'output_dir': 'charts/greedy'
     }
 }
 
 # Função para gerar gráficos
-def plot_metrics(df, output_dir):
+def plot_metrics(df, output_dir, algorithm_name):
     # Certificar-se de que o diretório de saída existe
     os.makedirs(output_dir, exist_ok=True)
 
@@ -44,7 +48,8 @@ def plot_metrics(df, output_dir):
             z = np.polyfit(df['time_in_minutes'], df[metric], 1)
             p = np.poly1d(z)
             plt.plot(df['time_in_minutes'], p(df['time_in_minutes']), linestyle='--', color='black', alpha=0.7)
-        plt.title(title)
+        # Incluir o nome do algoritmo no título
+        plt.title(f"{title} - {algorithm_name}")
         plt.xlabel('Tempo (minutos)')
         plt.ylabel(ylabel)
         plt.tight_layout()
@@ -63,6 +68,6 @@ for algorithm_name, data in algorithms.items():
         # Converter o tempo em segundos para minutos para melhor visualização
         df['time_in_minutes'] = df['time_in_seconds'] / 60
         # Gerar os gráficos
-        plot_metrics(df, output_dir)
+        plot_metrics(df, output_dir, algorithm_name)
     else:
         print(f"Arquivo CSV não encontrado: {csv_file}. Pulando {algorithm_name}.")

@@ -140,59 +140,7 @@ def calculate_reward(avg_response_time, throughput, cpu_percent, mem_usage):
     logging.info(f"Recompensa Calculada: {reward:.4f}")
     return reward
 
-def main():
-    # Número total de iterações
-    total_iterations = 1000
-
-    # Inicializar o cliente Docker
-    docker_client = docker.from_env()
-
-    # Obter todas as composições disponíveis
-    configs = eRI.get_all_configs()
-    if not configs:
-        logging.error("Nenhuma configuração disponível. Verifique se o EWS está funcionando corretamente.")
-        return
-
-    logging.info("Configurações disponíveis:")
-    for idx, config in enumerate(configs):
-        logging.info(f"ID: {idx}, Descrição: {config.original_json}")
-
-    # Obter a composição atual
-    current_config = eRI.get_config()
-    if not current_config:
-        logging.error("Não foi possível obter a configuração atual.")
-    else:
-        logging.info(f"Configuração Atual: {current_config.original_json}")
-
-    # Menu para o usuário escolher o algoritmo
-    print("Selecione o algoritmo para selecionar a configuração ideal do EWS:")
-    print("1. UCB1 (Upper Confidence Bound)")
-    print("2. Força Bruta")
-    print("3. Algoritmo Guloso (Greedy)")
-    choice = input("Digite 1, 2 ou 3: ")
-
-    if choice == '1':
-        algorithm = 'UCB1'
-        logging.info("Algoritmo selecionado: UCB1")
-        # Inicializar o algoritmo UCB1
-        n_arms = len(configs)
-        selector = UCB1(n_arms)
-    elif choice == '2':
-        algorithm = 'BRUTE-FORCE'
-        logging.info("Algoritmo selecionado: Força Bruta")
-        # Inicializar o algoritmo Força Bruta
-        n_arms = len(configs)
-        selector = BruteForce(n_arms)
-    elif choice == '3':
-        algorithm = 'GREEDY'
-        logging.info("Algoritmo selecionado: Guloso")
-        # Inicializar o algoritmo Guloso
-        n_arms = len(configs)
-        selector = Greedy(n_arms)
-    else:
-        print("Escolha inválida. Por favor, execute o script novamente e selecione uma opção válida.")
-        return
-
+def run_algorithm(algorithm_name, selector_class, configs, total_iterations, docker_client):
     # Inicializar o DataFrame para armazenar as métricas ao longo do tempo
     columns = ['iteration', 'time_in_seconds', 'selected_config_idx', 'reward', 'cpu_percent', 'mem_usage', 'throughput', 'response_time']
     reward_timeseries = pd.DataFrame(columns=columns)
@@ -200,9 +148,13 @@ def main():
     start_time = time.time()
     throughput = 0
 
+    n_arms = len(configs)
+    selector = selector_class(n_arms)
+    logging.info(f"Iniciando o algoritmo {algorithm_name}")
+
     try:
         # Barra de progresso
-        with tqdm(total=total_iterations) as pbar:
+        with tqdm(total=total_iterations, desc=f"Executando {algorithm_name}") as pbar:
             for iteration in range(1, total_iterations + 1):
                 # Selecionar a próxima composição com base no algoritmo escolhido
                 arm = selector.select_arm()
@@ -236,7 +188,7 @@ def main():
                 reward_timeseries = reward_timeseries.append(pd.Series(metrics, index=reward_timeseries.columns), ignore_index=True)
 
                 # Salvar o DataFrame parcialmente em CSV a cada iteração
-                csv_filename = f'reward_timeseries_{algorithm}.csv'
+                csv_filename = f'reward_timeseries_{algorithm_name}.csv'
                 reward_timeseries.to_csv(csv_filename, index=False)
 
                 # Atualizar o algoritmo (se necessário)
@@ -251,11 +203,68 @@ def main():
                 # Intervalo entre as iterações
                 time.sleep(5)
     except KeyboardInterrupt:
-        logging.info("Monitoramento interrompido pelo usuário.")
+        logging.info(f"Monitoramento interrompido pelo usuário no algoritmo {algorithm_name}.")
     except Exception as e:
-        logging.error(f"Erro inesperado: {e}")
+        logging.error(f"Erro inesperado no algoritmo {algorithm_name}: {e}")
     finally:
-        logging.info("Execução concluída.")
+        logging.info(f"Execução do algoritmo {algorithm_name} concluída.")
+
+def main():
+    # Número total de iterações
+    total_iterations = 500  # Alterado para 500
+
+    # Inicializar o cliente Docker
+    docker_client = docker.from_env()
+
+    # Obter todas as composições disponíveis
+    configs = eRI.get_all_configs()
+    if not configs:
+        logging.error("Nenhuma configuração disponível. Verifique se o EWS está funcionando corretamente.")
+        return
+
+    logging.info("Configurações disponíveis:")
+    for idx, config in enumerate(configs):
+        logging.info(f"ID: {idx}, Descrição: {config.original_json}")
+
+    # Obter a composição atual
+    current_config = eRI.get_config()
+    if not current_config:
+        logging.error("Não foi possível obter a configuração atual.")
+    else:
+        logging.info(f"Configuração Atual: {current_config.original_json}")
+
+    # Menu para o usuário escolher o algoritmo
+    print("Selecione o algoritmo para selecionar a configuração ideal do EWS:")
+    print("1. UCB1 (Upper Confidence Bound)")
+    print("2. Força Bruta")
+    print("3. Algoritmo Guloso (Greedy)")
+    print("4. Rodar todos os métodos")
+    choice = input("Digite 1, 2, 3 ou 4: ")
+
+    if choice == '1':
+        algorithm = 'UCB1'
+        logging.info("Algoritmo selecionado: UCB1")
+        run_algorithm(algorithm_name=algorithm, selector_class=UCB1, configs=configs, total_iterations=total_iterations, docker_client=docker_client)
+    elif choice == '2':
+        algorithm = 'BRUTE-FORCE'
+        logging.info("Algoritmo selecionado: Força Bruta")
+        run_algorithm(algorithm_name=algorithm, selector_class=BruteForce, configs=configs, total_iterations=total_iterations, docker_client=docker_client)
+    elif choice == '3':
+        algorithm = 'GREEDY'
+        logging.info("Algoritmo selecionado: Guloso")
+        run_algorithm(algorithm_name=algorithm, selector_class=Greedy, configs=configs, total_iterations=total_iterations, docker_client=docker_client)
+    elif choice == '4':
+        # Rodar todos os métodos sequencialmente
+        algorithms = [
+            ('UCB1', UCB1),
+            ('BRUTE-FORCE', BruteForce),
+            ('GREEDY', Greedy)
+        ]
+        for algorithm_name, selector_class in algorithms:
+            run_algorithm(algorithm_name=algorithm_name, selector_class=selector_class, configs=configs, total_iterations=total_iterations, docker_client=docker_client)
+    else:
+        print("Escolha inválida. Por favor, execute o script novamente e selecione uma opção válida.")
+        return
 
 if __name__ == "__main__":
     main()
