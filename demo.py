@@ -1,3 +1,5 @@
+# DESCONSIDERAR ESSE ARQUIVO - FOI USADO PARA TESTES INICIAIS
+
 from pyews.server_interface import ewsRESTInterface as eRI 
 from pyews.global_vars import settings
 import numpy as np

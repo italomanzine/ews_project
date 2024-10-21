@@ -1,3 +1,5 @@
+# DESCONSIDERAR ESSE ARQUIVO - FOI USADO PARA TESTES INICIAIS
+
 import docker
 
 def get_container_metrics(container_name):

@@ -5,7 +5,7 @@ import logging
 import pandas as pd
 from pyews.server_interface import ewsRESTInterface as eRI
 from pyews.global_vars import settings
-from tqdm import tqdm  # Biblioteca para a barra de progresso
+from tqdm import tqdm
 
 # Configurações do EWS
 settings["IP"] = "http://localhost:2011/"
