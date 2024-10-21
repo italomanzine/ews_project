@@ -1,52 +1,61 @@
 @startuml
 
-!define ICONPATH ./icons
-
-!include ICONPATH/docker.puml
-!include ICONPATH/python.puml
-!include ICONPATH/file.puml
-!include ICONPATH/chart.puml
-
 skinparam componentStyle rectangle
 skinparam shadowing false
 
 title Arquitetura do Sistema de Monitoramento do EWS
 
-component [<&docker>\nContêiner Docker\n(EWS)] as DockerContainer
-component [<&python>\nScript de Monitoramento\n(ews_monitor.py)] as MonitorScript
-component [<&python>\nScript de Plotagem\n(chart.py)] as ChartScript
-component [<&file>\nArquivos CSV\n(Métricas)] as CSVFiles
-component [<&chart>\nGráficos Gerados\n(Charts)] as Charts
+' Definição de componentes
 
-' Definição dos serviços
+package "Contêiner Docker" {
+    [EWS (InteractiveEmergentSys.o)] as EWS
+    [Cliente de Carga\n(ClientTextPattern.o)] as ClientLoad
+}
+
+component [Script de Monitoramento\n(ews_monitor.py)] as MonitorScript
+component [Script de Plotagem\n(chart.py)] as ChartScript
+component [Arquivos CSV\n(Métricas)] as CSVFiles
+component [Gráficos Gerados\n(Charts)] as Charts
 
 rectangle "Docker Daemon" as DockerDaemon
 rectangle "API REST do EWS" as EWSAPI
 
 ' Relacionamentos
 
-DockerContainer -left-> DockerDaemon : Executa dentro de
+EWS -up-> DockerDaemon : Executa dentro de
+ClientLoad -up-> DockerDaemon : Executa dentro de
+
 MonitorScript -down-> DockerDaemon : Coleta métricas do contêiner
 MonitorScript -right-> EWSAPI : Comunica via API REST
 MonitorScript -down-> CSVFiles : Salva métricas em
+
+EWSAPI -up-> DockerDaemon : Executa dentro de
+
 ChartScript -down-> CSVFiles : Lê métricas de
 ChartScript -down-> Charts : Gera gráficos em
 
 ' Notas
 
-note right of DockerContainer
-  O EWS roda dentro do contêiner Docker.
+note bottom of EWS
+  Iniciado pelo comando:
+  dana -sp ../repository InteractiveEmergentSys.o
 end note
 
-note bottom of MonitorScript
-  O script aplica diferentes algoritmos:
+note bottom of ClientLoad
+  Iniciado pelo comando:
+  dana ClientTextPattern.o
+end note
+
+note right of MonitorScript
+  Utiliza a biblioteca pyews para interagir com a API REST do EWS.
+  Aplica algoritmos de seleção de configuração:
   - UCB1
   - Força Bruta
   - Guloso (Greedy)
 end note
 
 note left of ChartScript
-  O script gera gráficos para cada algoritmo.
+  Gera gráficos baseados nas métricas coletadas.
 end note
 
 @enduml
